@@ -38,33 +38,37 @@ class CLOB:
         price = order_obj[order_id][0]
         order_obj[order_id] = [price,new_size,order_id]
         
-    def update_from_message(self,message_obj):
+    def order_update(self,order_obj,message_obj):
         message_type = message_obj['type']
+        if message_type == 'done':
+            self.order_remove(order_obj,message_obj['order_id'])
+        elif message_type == 'open':
+            self.order_add(order_obj,message_obj['price'],message_obj['remaining_size'],message_obj['order_id'])
+        elif message_type == 'match':
+            self.order_size_decrease(order_obj,message_obj['maker_order_id'],message_obj['size'])
+
+    def sequence_number_update(self,message_obj):
+        self.sequence  = message_obj['sequence']
+
+    def order_object_determine(self,message_obj):
         message_side = message_obj['side']
         if message_side == 'sell':
             order_obj = self.asks_obj
         elif message_side == 'buy' :
             order_obj = self.bids_obj
-        
-        if message_type == 'done':
-            self.order_remove(order_obj,message_obj['order_id'])
-        elif message_type == 'open':
-            self.order_add(order_obj,message_obj['price'],message_obj['remaining_size'],message_obj['order_id'])
-        elif message_type == 'match' and message_side == 'buy':
-            self.order_size_decrease(order_obj,message_obj['maker_order_id'],message_obj['size'])
-          
-        elif message_type == 'match' and message_side == 'sell':
-            self.order_size_decrease(order_obj,message_obj['maker_order_id'],message_obj['size'])
-            
-        self.sequence  = message_obj['sequence']
-            
+        return order_obj
+
+    def update_from_message(self,message_obj):
+        order_obj = self.order_object_determine(message_obj)
+        self.order_update(order_obj,message_obj)
+        self.sequence_number_update(message_obj)
+
     def get_clob(self):
         return {
             'bids':self.bids_obj.values(),
             'asks':self.asks_obj.values(),
             'sequence':self.sequence
         }
-
 
 class CLOBSync(object):
     def clob_sync(self,initial_clob,messages_data_filtered):
