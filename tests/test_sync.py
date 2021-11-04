@@ -1,9 +1,9 @@
 import sys, os 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import unittest
-from sync import CLOBSync
-from sync import DataLoad
+from sync import CLOBSync, DataLoad
 import logging 
+
 LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
 logging.basicConfig(level=logging.INFO,format=LOG_FORMAT,filemode="w")
 logger = logging.getLogger()

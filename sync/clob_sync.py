@@ -1,10 +1,44 @@
 import logging
 import queue
+import gzip
+import json
 
 LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
 logging.basicConfig(level=logging.INFO,format=LOG_FORMAT,filemode="w")
 logger = logging.getLogger()
 
+class DataLoad(object):
+    def messages_parse(self,data):
+        data_with_no_binary = str(data).split("'")[1:-1][0]
+        data_list =[i for i in data_with_no_binary.split('\\n') if i != '']
+        messages_data = [json.loads(D) for D in data_list]
+        return messages_data 
+
+    def messages_read(self,file="../data/coinbase_BTC-USD_20_10_06_000000-010000.json.gz"):
+        file_object = gzip.open(file, "r")
+        data = file_object.read()
+        logger.info('loaded messages data: %s', str(file))
+        messages_data = self.messages_parse(data)
+        logger.info('loaded %s messages', str(len(messages_data)))
+        return messages_data 
+
+    def snapshot_read(self,file="../data/coinbase_BTC-USD_20_10_06_00_00.json"):
+        snaphsot_data = json.loads(open(file,'r').read())
+        logger.info('loaded snapshot data: %s', str(file))
+        return snaphsot_data
+
+    def messages_filter(self,messages_data,initial_clob,final_clob):
+        messages_data_filtered = [message_dict for message_dict in messages_data if message_dict['sequence'] >= initial_clob['sequence'] and message_dict['sequence'] <= final_clob['sequence']]
+        logger.info('filter messages for sequence number after initial sequence number and before sequence number of final clob')
+        return messages_data_filtered
+
+    def data_load(self):
+        """Returns the initial and final CLOB snapshot datasets, as well as messages filtered for sequence number"""
+        messages_data = self.messages_read(file="../data/coinbase_BTC-USD_20_10_06_000000-010000.json.gz")
+        initial_clob = self.snapshot_read(file="../data/coinbase_BTC-USD_20_10_06_00_00.json")
+        final_clob = self.snapshot_read(file="../data/coinbase_BTC-USD_20_10_06_00_15.json")
+        messages_data_filtered = self.messages_filter(messages_data,initial_clob,final_clob)
+        return initial_clob,final_clob,messages_data_filtered
 
 class OrderDictTable:
     """
@@ -78,7 +112,7 @@ class CLOB:
 
 class CLOBSync(object):
     """
-
+        Applies messages to initial clob by looping through each message
     """
     def clob_sync(self,initial_clob,messages_data_filtered):
         clob = CLOB(initial_clob)
@@ -93,8 +127,10 @@ class CLOBSync(object):
 
         logger.info('Apply the changes from messages')
         final_clob_processed = clob.get_clob()
+        logger.info('Done applying messages to CLOB')
         return final_clob_processed
 
 
 if __name__ == '__main__':
-    pass 
+    initial_clob,final_clob,messages_data_filtered = DataLoad().data_load()
+    updated_clob = CLOBSync().clob_sync(initial_clob,messages_data_filtered)
